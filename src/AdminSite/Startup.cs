@@ -83,7 +83,7 @@ public class Startup
         {
             KnownUsers = this.Configuration["KnownUsers"],
         };
-        var creds = new ClientSecretCredential(config.TenantId.ToString(), config.ClientId.ToString(), config.ClientSecret);
+        var creds = new ClientSecretCredential(config.TenantId.ToString(), config.MTClientId.ToString(), config.ClientSecret);
 
 
         services
@@ -95,8 +95,8 @@ public class Startup
             })
             .AddOpenIdConnect(options =>
             {
-                options.Authority = $"{config.AdAuthenticationEndPoint}/common/v2.0";
-                options.ClientId = config.MTClientId;
+                options.Authority = $"{config.AdAuthenticationEndPoint}/{config.TenantId}/v2.0";
+                options.ClientId = config.ClientId;
                 options.ResponseType = OpenIdConnectResponseType.IdToken;
                 options.CallbackPath = "/Home/Index";
                 options.SignedOutRedirectUri = config.SignedOutRedirectUri;

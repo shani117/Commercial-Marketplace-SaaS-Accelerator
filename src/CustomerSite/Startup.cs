@@ -6,6 +6,7 @@ using Marketplace.SaaS.Accelerator.CustomerSite.Controllers;
 using Marketplace.SaaS.Accelerator.CustomerSite.WebHook;
 using Marketplace.SaaS.Accelerator.DataAccess.Context;
 using Marketplace.SaaS.Accelerator.DataAccess.Contracts;
+using Marketplace.SaaS.Accelerator.DataAccess.Entities;
 using Marketplace.SaaS.Accelerator.DataAccess.Services;
 using Marketplace.SaaS.Accelerator.Services.Configurations;
 using Marketplace.SaaS.Accelerator.Services.Contracts;
@@ -88,7 +89,7 @@ public class Startup
             .AddCookie()
             .AddOpenIdConnect(options =>
             {
-                options.Authority = $"{config.AdAuthenticationEndPoint}/common/v2.0";
+                options.Authority = $"{config.AdAuthenticationEndPoint}/organizations/v2.0";
                 options.ClientId = config.MTClientId;
                 options.ResponseType = OpenIdConnectResponseType.IdToken;
                 options.CallbackPath = "/Home/Index";
