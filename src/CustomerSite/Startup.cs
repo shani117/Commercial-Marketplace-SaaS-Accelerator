@@ -3,6 +3,7 @@
 
 using Azure.Identity;
 using Marketplace.SaaS.Accelerator.CustomerSite.Controllers;
+using Marketplace.SaaS.Accelerator.CustomerSite.GraphOperations;
 using Marketplace.SaaS.Accelerator.CustomerSite.WebHook;
 using Marketplace.SaaS.Accelerator.DataAccess.Context;
 using Marketplace.SaaS.Accelerator.DataAccess.Contracts;
@@ -16,14 +17,19 @@ using Marketplace.SaaS.Accelerator.Services.WebHook;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Graph;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.Marketplace.SaaS;
 using System;
@@ -79,29 +85,17 @@ public class Startup
         };
         var creds = new ClientSecretCredential(config.TenantId.ToString(), config.ClientId.ToString(), config.ClientSecret);
 
-        services
-            .AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = OpenIdConnectDefaults.AuthenticationScheme;
-                options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            })
-            .AddCookie()
-            .AddOpenIdConnect(options =>
-            {
-                options.Authority = $"{config.AdAuthenticationEndPoint}/organizations/v2.0";
-                options.ClientId = config.MTClientId;
-                options.ResponseType = OpenIdConnectResponseType.IdToken;
-                options.CallbackPath = "/Home/Index";
-                options.SignedOutRedirectUri = config.SignedOutRedirectUri;
-                options.TokenValidationParameters.NameClaimType = ClaimConstants.CLAIM_NAME; //This does not seem to take effect on User.Identity. See Note in CustomClaimsTransformation.cs
-                options.TokenValidationParameters.ValidateIssuer = false;
-            });
+        services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+            .AddMicrosoftIdentityWebApp(Configuration.GetSection("AzureAd"))
+            .EnableTokenAcquisitionToCallDownstreamApi()
+            .AddInMemoryTokenCaches();
+
+        services.AddGraphService(this.Configuration);
+
         services
             .AddTransient<IClaimsTransformation, CustomClaimsTransformation>()
             .AddScoped<ExceptionHandlerAttribute>()
-            .AddScoped<RequestLoggerActionFilter>()
-        ;
+            .AddScoped<RequestLoggerActionFilter>();
 
         if (!Uri.TryCreate(config.FulFillmentAPIBaseURL, UriKind.Absolute, out var fulfillmentBaseApi)) 
         {
@@ -117,7 +111,16 @@ public class Startup
 
         InitializeRepositoryServices(services);
 
-        services.AddMvc(option => option.EnableEndpointRouting = false);
+        services.AddControllersWithViews(options =>
+        {
+            var policy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
+            options.Filters.Add(new AuthorizeFilter(policy));
+        }).AddMicrosoftIdentityUI();
+        services.AddRazorPages();
+
+        //services.AddMvc(option => option.EnableEndpointRouting = false);
     }
 
     /// <summary>
@@ -141,12 +144,33 @@ public class Startup
         app.UseHttpsRedirection();
         app.UseStaticFiles();
         app.UseCookiePolicy();
+
+        app.UseRouting();
         app.UseAuthentication();
-        app.UseMvc(routes =>
+        app.UseAuthorization();
+
+        //app.UseMvc(routes =>
+        //{
+        //    routes.MapRoute(
+        //        name: "Index",
+        //        template: "{controller=Home}/{action=Index}/{id?}");
+
+        //    routes.MapRoute(
+        //        name: "default",
+        //        template: "{controller}/{action}/{id?}");
+        //});
+
+        app.UseEndpoints(endpoints =>
         {
-            routes.MapRoute(
+            endpoints.MapControllerRoute(
+                name: "Index",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
+            endpoints.MapRazorPages();
+
+            endpoints.MapControllerRoute(
                 name: "default",
-                template: "{controller=Home}/{action=Index}/{id?}");
+                pattern: "{controller}/{action}/{id?}");
+            endpoints.MapRazorPages();
         });
     }
 

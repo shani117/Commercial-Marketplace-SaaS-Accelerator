@@ -1,0 +1,97 @@
+﻿@using Microsoft.Graph
+@model Microsoft.Graph.Models.AppRoleAssignment[]
+@{
+    ViewData["Title"] = "App Role Management";
+}
+
+<div class="text-center">
+    <div class="container">
+        <br />
+        
+        <form method="post">
+            <div>
+                <div class="card-body">
+                    <div>
+                        <div class="text-start">
+                            <span class="cm-section-heading">App Role Assignments</span>
+                        </div>
+                        @if (Model.Count() > 0)
+                        {
+                            <table id="table" class="table table-bordered dt-responsive cm-table mt20">
+                                <thead class="cm-table-head">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>User ID</th>
+                                        <th>Resource Name</th>
+                                        <th>Resource ID</th>
+                                        <th>Principal Type</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (var i = 0; i < Model.Count()-1; i++)
+                                    {
+                                        var assignment = Model[i];
+                                        <tr>
+                                            <td class="text-left">
+                                                @Html.HiddenFor(s => s[i].PrincipalId)
+                                                @Html.HiddenFor(s => s[i].ResourceId)
+                                                @assignment.PrincipalDisplayName
+                                            </td>
+                                            <td class="text-left">@assignment.PrincipalId</td>
+                                            <td class="text-left">@assignment.ResourceDisplayName</td>
+                                            <td class="text-left">@assignment.ResourceId</td>
+                                            <td class="text-left">@assignment.PrincipalType</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+
+                        else
+                        {
+                            <div class="cm-panel-default mt40">
+                                <div class="p-3 mr420">
+                                    <p>
+                                        Currently, there are no app role assignments for the CionSystems.TenantSvc.WebAPI Service Principal in your tenant!!
+                                        Add someone to allow them to login to the SaaS application at <a href="https://cionsystemstenantux.azurewebsites.net/" target="_blank">Cion Systems Entra ID Management Application</a>
+                                    </p>
+                                </div>
+                            </div>
+
+                        }
+                    </div>
+                </div>
+            </div>
+            <!-- Modal -->
+            @* <div class="modal" id="myModal" role="dialog" tabindex="-1"> *@
+
+            <!-- Button trigger modal -->
+            @* <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
+                Launch demo modal
+            </button> *@
+            <p></p>
+            <!-- Modal -->
+            <div class="modal" id="myModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        @* <div class="modal-body">
+                            
+                        </div>
+                        <div class="modal-footer">
+                            
+                            
+                        </div> *@
+                    </div>
+                </div>
+            </div>
+
+
+            
+        </form>
+    </div>
+</div>
