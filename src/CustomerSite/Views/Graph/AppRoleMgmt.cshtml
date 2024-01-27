@@ -1,5 +1,5 @@
-﻿@using Microsoft.Graph
-@model Microsoft.Graph.Models.AppRoleAssignment[]
+﻿@using Marketplace.SaaS.Accelerator.Services.Models
+@model GraphPageModel
 @{
     ViewData["Title"] = "App Role Management";
 }
@@ -8,43 +8,58 @@
     <div class="container">
         <br />
         
-        <form method="post">
+        <form id="appRoleUsers" method="post">
             <div>
                 <div class="card-body">
                     <div>
                         <div class="text-start">
                             <span class="cm-section-heading">App Role Assignments</span>
                         </div>
-                        @if (Model.Count() > 0)
+                        @if(!Model.HasClientConsented)
                         {
-                            <table id="table" class="table table-bordered dt-responsive cm-table mt20">
+                            <div>
+                                Looks like you have NOT consented to our app yet, please consent to CionSystems.TenantSvc.WebAPI service principal in your tenant!! <br />
+                                You can go to <a href="https://cionsystemstenantux.azurewebsites.net/" target="_blank">Cion Systems Entra ID Management Application</a> to consent to our SPN and come back here to complete the subscription process.
+                            </div>
+                        }
+                        @if (Model.RoleAssignments.Count() > 0)
+                        {
+                            <table id="tblAppRoles" class="table table-bordered dt-responsive cm-table mt20">
                                 <thead class="cm-table-head">
                                     <tr>
                                         <th>Name</th>
-                                        <th>User ID</th>
                                         <th>Resource Name</th>
-                                        <th>Resource ID</th>
+                                        <th>Role Name</th>
+                                        <th>Role Description</th>
                                         <th>Principal Type</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @for (var i = 0; i < Model.Count()-1; i++)
+                                    @for (var i = 0; i < Model.RoleAssignments.Count(); i++)
                                     {
-                                        var assignment = Model[i];
+                                        var assignment = Model.RoleAssignments[i];
                                         <tr>
                                             <td class="text-left">
-                                                @Html.HiddenFor(s => s[i].PrincipalId)
-                                                @Html.HiddenFor(s => s[i].ResourceId)
-                                                @assignment.PrincipalDisplayName
+                                                @Html.HiddenFor(s => s.RoleAssignments[i].RoleAssignment.PrincipalId)
+                                                @Html.HiddenFor(s => s.RoleAssignments[i].RoleAssignment.Id)
+                                                @assignment.RoleAssignment.PrincipalDisplayName
                                             </td>
-                                            <td class="text-left">@assignment.PrincipalId</td>
-                                            <td class="text-left">@assignment.ResourceDisplayName</td>
-                                            <td class="text-left">@assignment.ResourceId</td>
-                                            <td class="text-left">@assignment.PrincipalType</td>
+                                            <td class="text-left">@assignment.RoleAssignment.ResourceDisplayName</td>
+                                            <td class="text-left">@assignment.AppRoleDisplayName</td>
+                                            <td class="text-left">@assignment.AppRoleDescription</td>
+                                            <td class="text-left">@assignment.RoleAssignment.PrincipalType</td>
+                                            <td><input type="button" class="btn btn-danger btn-sm delete" value="Remove Assignment" data-principalId="@assignment.RoleAssignment.PrincipalId" data-assignmentId="@assignment.RoleAssignment.Id" onclick="Remove(this)"></td>
                                         </tr>
                                     }
                                 </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td><input type="email" placeholder="Enter user UPN"  id="txtUserEmail" required /></td>
+                                        <td>@Html.DropDownList("AppRoles", (IEnumerable<SelectListItem>)@ViewBag.AppRoles, "Select Role", new { @class = "form-select", @id = "app-role" })</td>
+                                        <td><input type="button" id="btnAdd" class="btn btn-info save" value="Add User to Role" onclick="AddRole(this)" /></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         }
 
@@ -53,7 +68,7 @@
                             <div class="cm-panel-default mt40">
                                 <div class="p-3 mr420">
                                     <p>
-                                        Currently, there are no app role assignments for the CionSystems.TenantSvc.WebAPI Service Principal in your tenant!!
+                                        Currently, there are no app role assignments for the CionSystems.TenantSvc.WebAPI Service Principal in your tenant!! <br />
                                         Add someone to allow them to login to the SaaS application at <a href="https://cionsystemstenantux.azurewebsites.net/" target="_blank">Cion Systems Entra ID Management Application</a>
                                     </p>
                                 </div>
@@ -62,36 +77,82 @@
                         }
                     </div>
                 </div>
-            </div>
-            <!-- Modal -->
-            @* <div class="modal" id="myModal" role="dialog" tabindex="-1"> *@
-
-            <!-- Button trigger modal -->
-            @* <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
-                Launch demo modal
-            </button> *@
-            <p></p>
-            <!-- Modal -->
-            <div class="modal" id="myModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        @* <div class="modal-body">
-                            
-                        </div>
-                        <div class="modal-footer">
-                            
-                            
-                        </div> *@
-                    </div>
-                </div>
-            </div>
-
-
-            
+            </div>            
         </form>
     </div>
 </div>
+
+<script>
+    function AddRole(button) {
+        var formValid = document.forms["appRoleUsers"].checkValidity();
+        if (formValid) {
+            var knownUsers = new Array();
+            var txtUserEmail = $("#txtUserEmail");
+            var appRole = $("#app-role")
+            var assignRoleModel = {};
+            assignRoleModel.UserUpn = txtUserEmail.val();
+            assignRoleModel.AppRoleId = appRole.val();
+            $.ajax({
+                type: "POST",
+                url: "GrantAppRoleToUser",
+                data: JSON.stringify(assignRoleModel),
+                contentType: "application/json",
+                dataType: "json",
+                success: function (result) {
+                    successconfirmDialog(result);
+                },
+                error:
+                    function (request, status, errorThrown) {
+                        errorconfirmDialog(status);
+                    }
+            });
+        }
+    }
+
+    function Remove(button) {
+
+        var row = $(button).closest("TR");
+        var name = $("TD", row).eq(0).html();
+        var table = $("#tblAppRoles")[0];
+
+        var pid = button.getAttribute("data-principalId");
+        var aid = button.getAttribute("data-assignmentId");
+
+        var assignRoleModel = {};
+        assignRoleModel.PrincipalId = pid;
+        assignRoleModel.AssignmentId = aid;
+
+        $.ajax({
+            type: "POST",
+            url: "RemoveAppRoleFromUser",
+            data: JSON.stringify(assignRoleModel),
+            contentType: "application/json",
+            dataType: "json",
+            success: function (result) {
+                table.deleteRow(row[0].rowIndex);
+                successconfirmDialog(result);
+            },
+            error:
+                function (request, status, errorThrown) {
+                    errorconfirmDialog(status);
+                }
+        });
+    };
+
+    function successconfirmDialog(msg) {
+        swal({
+            title: "Saved",
+            text: msg,
+            icon: "success",
+            timer: 3000
+        })
+    }
+    function errorconfirmDialog(msg) {
+        swal({
+            title: "Error",
+            text: msg,
+            icon: "error",
+            timer: 3000
+        })
+    }
+</script>
