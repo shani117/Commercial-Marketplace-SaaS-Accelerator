@@ -244,14 +244,20 @@ else
 }
 <script type="text/javascript">
 
+    $(document).ajaxStop($.unblockUI);
+
     function SubscriptionOperation(subscriptionId, planId, operation) {
         if (validate()) {
+            $.blockUI({ message: '<h1><img src="busy.gif" /> Just a moment...</h1>' });
             var formobject = $('#frmIndex').serialize();
             $.ajax({
                 url: '/Home/SubscriptionOperation',
                 type: 'POST',
                 data: formobject + "&subscriptionId=" + subscriptionId + "&planId=" + planId + "&operation=" + operation,
                 cache: false,
+                complete: function () {
+                    $.unblockUI();
+                },
                 success: function (result) {
                     $('#divIndex').html(result);
                 },
