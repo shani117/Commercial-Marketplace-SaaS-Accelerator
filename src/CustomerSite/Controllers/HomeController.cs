@@ -301,7 +301,9 @@ public class HomeController : BaseController
         }
     }
 
-    private IActionResult RequestAdminConsent(string tenantId)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    private IActionResult RequestAdminConsent(string tenantId, string token)
     {
         this.logger.Info("Home Controller / RequestAdminConsent ");
 
@@ -310,21 +312,27 @@ public class HomeController : BaseController
             var clientId = this.saaSApiClientConfiguration.MTClientId;
             var state = Guid.NewGuid().ToString(); // Generate a new GUID
             this.stateGuids.Add(state);
-            var redirectUri = Url.Action("AdminConsentCallback", "Home", null, Request.Scheme);
+            var redirectUri = Url.Action("AdminConsentCallback", "Home", new { token }, Request.Scheme);
 
-            var adminConsentUrl = $"https://login.microsoftonline.com/{tenantId}/adminconsent?client_id={clientId}&state={state}&redirect_uri={redirectUri}";
+            var adminConsentUrl = $"https://login.microsoftonline.com/{tenantId}/adminconsent?client_id={clientId}&state={state}";
 
             return Redirect(adminConsentUrl);
         }
-        return RedirectToAction("Index");
+        return RedirectToAction("Index", new { token });
     }
 
-    private IActionResult AdminConsentCallback(string admin_consent, string tenant, string state)
+    private IActionResult AdminConsentCallback(string admin_consent, string tenant, string state, string token)
     {
         // Validate the state value to ensure it's the one you generated
         // Handle the admin consent response
         this.logger.Info("Home Controller / AdminConsentCallback ");
-        return View();
+        if(admin_consent.Equals("true", StringComparison.InvariantCultureIgnoreCase) && stateGuids.Contains(state))
+        {
+            stateGuids.Remove(state);
+            RedirectToAction("Index", new { token, consentGranted = true });
+        }
+        var ex = new ApplicationException("Error occured in the consent flow, please try again");
+        return this.View("Error", ex);
     }
 
 

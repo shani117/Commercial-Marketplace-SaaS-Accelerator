@@ -55,14 +55,14 @@ public class GraphController : BaseController
         return View();
     }
 
-    [AuthorizeForScopes(Scopes = new[] { GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll })]
+    [AuthorizeForScopes(Scopes = new[] { GraphConstants.UserReadBasicAll, GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll })]
     public async Task<IActionResult> AppRoleMgmt()
     {
         GraphPageModel pgModel = new GraphPageModel();
         List<SpnAssignment> spnAssignments = new List<SpnAssignment>();
 
         var accessToken =
-            await tokenAcquisition.GetAccessTokenForUserAsync(new[] { GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll });
+            await tokenAcquisition.GetAccessTokenForUserAsync(new[] { GraphConstants.UserReadBasicAll, GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll });
 
         cionSysSpn = await graphApiOperations.GetCionSysSPNFromTenant(accessToken, "c37a71d2-b811-4bfc-a52b-04d209f3e98c");
 
@@ -90,12 +90,14 @@ public class GraphController : BaseController
         return View(pgModel);
     }
 
-    [AuthorizeForScopes(Scopes = new[] { GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll })]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [AuthorizeForScopes(Scopes = new[] { GraphConstants.UserReadBasicAll, GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll })]
     public async Task<JsonResult> GrantAppRoleToUser([FromBody] AddSpnAssignmentPageModel userAssignment)
     {
 
         var accessToken =
-            await tokenAcquisition.GetAccessTokenForUserAsync(new[] { GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll });
+            await tokenAcquisition.GetAccessTokenForUserAsync(new[] { GraphConstants.UserReadBasicAll, GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll });
 
         try
         {
@@ -119,11 +121,13 @@ public class GraphController : BaseController
         }
     }
 
-    [AuthorizeForScopes(Scopes = new[] { GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll })]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [AuthorizeForScopes(Scopes = new[] { GraphConstants.UserReadBasicAll, GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll })]
     public async Task<JsonResult> RemoveAppRoleFromUser([FromBody] RemoveSpnAssignmentPageModel userAssignment)
     {
         var accessToken =
-            await tokenAcquisition.GetAccessTokenForUserAsync(new[] { GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll });
+            await tokenAcquisition.GetAccessTokenForUserAsync(new[] { GraphConstants.UserReadBasicAll, GraphConstants.AppReadAll, GraphConstants.AppRoleRWAll });
 
         try
         {

@@ -3,6 +3,15 @@
 @{
     ViewData["Title"] = "App Role Management";
 }
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+
+@functions
+{
+    public string GetAntiXsrfRequestToken()
+    {
+        return Xsrf.GetAndStoreTokens(Context).RequestToken;
+    }
+}
 
 <div class="text-center">
     <div class="container">
@@ -95,6 +104,7 @@
             $.ajax({
                 type: "POST",
                 url: "GrantAppRoleToUser",
+                headers: { "RequestVerificationToken": "@GetAntiXsrfRequestToken()" },
                 data: JSON.stringify(assignRoleModel),
                 contentType: "application/json",
                 dataType: "json",
@@ -125,6 +135,7 @@
         $.ajax({
             type: "POST",
             url: "RemoveAppRoleFromUser",
+            headers: { "RequestVerificationToken": "@GetAntiXsrfRequestToken()" },
             data: JSON.stringify(assignRoleModel),
             contentType: "application/json",
             dataType: "json",

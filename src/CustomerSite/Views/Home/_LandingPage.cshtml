@@ -5,10 +5,21 @@
 
 @{
     ViewData["Title"] = "Home";
+    var tokenParam = this.TempData["AMPToken"];
 }
 @if (!Model.ShowWelcomeScreen)
 {
     <div class="container" id="divHome">
+
+        <div class="mt20">
+            <span class="cm-section-heading">Admin Consent & App Role Assignment</span>
+            <div>
+                To complete the subscripiton process, you need to admin consent to our application in your tenant by enrolling it into our service offering.<br />
+                You can go to <a href="https://cionsystemstenantux.azurewebsites.net/" target="_blank">Cion Systems Entra ID Management Application</a> to consent to our SPN and come back here to complete the subscription process.<br />
+                Once you have completed the consent process, you need to provision users from your tenant with appropriate roles to use the application. Use the <b>Role Assignments</b> menu tab to complete this task.
+            </div>
+        </div>
+
         <form method="post" id="frmIndex">
 
             <div class="text-white mt20">
@@ -259,8 +270,7 @@ else
 
         }
     }
-
-
+    
     function validate() {
         var valid = true;
         $(':input[required]:visible').each(function () {
