@@ -99,6 +99,8 @@ public class HomeController : BaseController
 
     private SaaSApiClientConfiguration saaSApiClientConfiguration;
 
+    private IAzureSubService azureSubService;
+
     private HashSet<string> stateGuids = new HashSet<string>();
 
     /// <summary>
@@ -126,7 +128,11 @@ public class HomeController : BaseController
     /// <param name="loggerFactory">The logger factory.</param>
     /// <param name="emailService">The email service.</param>
     /// <param name="webNotificationService">The web notification service</param>
-    public HomeController(SaaSClientLogger<HomeController> logger, IFulfillmentApiService apiService, ISubscriptionsRepository subscriptionRepo, IPlansRepository planRepository, IUsersRepository userRepository, IApplicationLogRepository applicationLogRepository, ISubscriptionLogRepository subscriptionLogsRepo, IApplicationConfigRepository applicationConfigRepository, IEmailTemplateRepository emailTemplateRepository, IOffersRepository offersRepository, IPlanEventsMappingRepository planEventsMappingRepository, IOfferAttributesRepository offerAttributesRepository, IEventsRepository eventsRepository, SaaSApiClientConfiguration saaSApiClientConfiguration, ILoggerFactory loggerFactory, IEmailService emailService,IWebNotificationService webNotificationService)
+    /// <param name="azSubService">The Azure subscription management serivce to manipulate storage accounts</param>
+    public HomeController(SaaSClientLogger<HomeController> logger, IFulfillmentApiService apiService, ISubscriptionsRepository subscriptionRepo, IPlansRepository planRepository, IUsersRepository userRepository, IApplicationLogRepository applicationLogRepository, ISubscriptionLogRepository subscriptionLogsRepo, 
+        IApplicationConfigRepository applicationConfigRepository,  IEmailTemplateRepository emailTemplateRepository, IOffersRepository offersRepository, IPlanEventsMappingRepository planEventsMappingRepository, IOfferAttributesRepository offerAttributesRepository, IEventsRepository eventsRepository, 
+        SaaSApiClientConfiguration saaSApiClientConfiguration, ILoggerFactory loggerFactory, 
+        IEmailService emailService,IWebNotificationService webNotificationService, IAzureSubService azSubService)
     {
         this.apiService = apiService;
         this.subscriptionRepository = subscriptionRepo;
@@ -150,6 +156,7 @@ public class HomeController : BaseController
         this.saaSApiClientConfiguration = saaSApiClientConfiguration;
         this.loggerFactory = loggerFactory;
         this._webNotificationService = webNotificationService;
+        this.azureSubService = azSubService;
 
         this.pendingActivationStatusHandlers = new PendingActivationStatusHandler(
             apiService,
@@ -627,7 +634,19 @@ public class HomeController : BaseController
                             }
                             else
                             {
-                                this.pendingFulfillmentStatusHandlers.Process(subscriptionId);
+                                var tenantName = subscriptionResultExtension.Purchaser.EmailId.Substring(subscriptionResultExtension.Purchaser.EmailId.IndexOf("@") + 1).Replace(".onmicrosoft.com", "");
+                                var tenantId = subscriptionResultExtension.Purchaser.TenantId.ToString();
+                                //This process will create the storage account for the tenant with the settings we want, creates 2 containers in the storage account and writes the storage keys to the AKV.
+                                var result = await this.azureSubService.InitializeTenantStorageAndAkv(tenantName, tenantId);
+                                if (result)
+                                {
+                                    this.logger.Info($"Successfully created storage account for tenant: {tenantName} ({tenantId})");
+                                    this.pendingFulfillmentStatusHandlers.Process(subscriptionId);
+                                }
+                                else
+                                {
+                                    this.logger.LogError($"FAILED to creat storage account for tenant: {tenantName} ({tenantId})");
+                                }
                             }
                             
                             await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters);

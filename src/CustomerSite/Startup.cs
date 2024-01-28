@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE file in the project root for license information.
 
 using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.Security.KeyVault.Secrets;
 using Marketplace.SaaS.Accelerator.CustomerSite.Controllers;
 using Marketplace.SaaS.Accelerator.CustomerSite.GraphOperations;
 using Marketplace.SaaS.Accelerator.CustomerSite.WebHook;
@@ -108,6 +110,14 @@ public class Startup
 
         services
             .AddDbContext<SaasKitContext>(options => options.UseSqlServer(this.Configuration.GetConnectionString("DefaultConnection")));
+
+        ArmClient armClient = new ArmClient(new DefaultAzureCredential(), Configuration["AzureSubscriptionId"]);
+        SecretClient secretClient = new SecretClient(vaultUri: new Uri(Configuration["VaultUrl"]), credential: new DefaultAzureCredential());
+
+        services.AddScoped<IAzureSubService, AzureSubService>(provider =>
+        {
+            return new AzureSubService(armClient, secretClient);
+        });
 
         InitializeRepositoryServices(services);
 
