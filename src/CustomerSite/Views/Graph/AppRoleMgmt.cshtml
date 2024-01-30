@@ -92,9 +92,13 @@
 </div>
 
 <script>
+
+    $(document).ajaxStop($.unblockUI);
+
     function AddRole(button) {
         var formValid = document.forms["appRoleUsers"].checkValidity();
         if (formValid) {
+            $.blockUI({ message: '<h1><img src="busy.gif" /> Just a moment...</h1>' });
             var knownUsers = new Array();
             var txtUserEmail = $("#txtUserEmail");
             var appRole = $("#app-role")
@@ -108,6 +112,9 @@
                 data: JSON.stringify(assignRoleModel),
                 contentType: "application/json",
                 dataType: "json",
+                complete: function () {
+                    $.unblockUI();
+                },
                 success: function (result) {
                     successconfirmDialog(result);
                 },
@@ -120,6 +127,7 @@
     }
 
     function Remove(button) {
+        $.blockUI({ message: '<h1><img src="busy.gif" /> Just a moment...</h1>' });
 
         var row = $(button).closest("TR");
         var name = $("TD", row).eq(0).html();
@@ -139,6 +147,9 @@
             data: JSON.stringify(assignRoleModel),
             contentType: "application/json",
             dataType: "json",
+            complete: function () {
+                $.unblockUI();
+            },
             success: function (result) {
                 table.deleteRow(row[0].rowIndex);
                 successconfirmDialog(result);

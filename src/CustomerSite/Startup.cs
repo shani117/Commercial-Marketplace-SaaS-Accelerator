@@ -116,7 +116,8 @@ public class Startup
 
         services.AddScoped<IAzureSubService, AzureSubService>(provider =>
         {
-            return new AzureSubService(armClient, secretClient);
+            SaaSClientLogger<AzureSubService> subLogger = new SaaSClientLogger<AzureSubService>();
+            return new AzureSubService(armClient, secretClient, subLogger);
         });
 
         InitializeRepositoryServices(services);
