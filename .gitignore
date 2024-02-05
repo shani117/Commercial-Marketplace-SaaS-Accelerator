@@ -361,3 +361,6 @@ src/Marketplace.SaaS.Accelerator.CustomerSite/appsettings.Development.json
 
 .vscode/launch.json
 .vscode/tasks.json
+/src/AdminSite/Properties/ServiceDependencies/CionSaasAdminPortal - Web Deploy/profile.arm.json
+/src/CustomerSite/Properties/ServiceDependencies/CionSaasPortal - Web Deploy/profile.arm.json
+/src/script.sql
