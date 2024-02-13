@@ -634,21 +634,24 @@ public class HomeController : BaseController
                             }
                             else
                             {
-                                var tenantName = subscriptionResultExtension.Purchaser.EmailId.Substring(subscriptionResultExtension.Purchaser.EmailId.IndexOf("@") + 1).Replace(".onmicrosoft.com", "");
-                                var tenantId = subscriptionResultExtension.Purchaser.TenantId.ToString();
-                                //This process will create the storage account for the tenant with the settings we want, creates 2 containers in the storage account and writes the storage keys to the AKV.
-                                var result = await this.azureSubService.InitializeTenantStorageAndAkv(tenantName, tenantId);
-                                if (result)
-                                {
-                                    this.logger.Info($"Successfully created storage account for tenant: {tenantName} ({tenantId})");
-                                    this.pendingFulfillmentStatusHandlers.Process(subscriptionId);
-                                }
-                                else
-                                {
-                                    this.logger.LogError($"FAILED to creat storage account for tenant: {tenantName} ({tenantId})");
-                                }
+                                this.pendingFulfillmentStatusHandlers.Process(subscriptionId);
                             }
-                            
+
+                            //whether auto provisioning is supported OR not, we should create the tenant specific resources in the publisher sub
+                            var tenantName = subscriptionResultExtension.Purchaser.EmailId.Substring(subscriptionResultExtension.Purchaser.EmailId.IndexOf("@") + 1).Replace(".onmicrosoft.com", "");
+                            var tenantId = subscriptionResultExtension.Purchaser.TenantId.ToString();
+                            //This process will create the storage account for the tenant with the settings we want, creates 2 containers in the storage account and writes the storage keys to the AKV.
+                            var result = await this.azureSubService.InitializeTenantStorageAndAkv(tenantName, tenantId);
+                            if (result)
+                            {
+                                this.logger.Info($"Successfully created storage account for tenant: {tenantName} ({tenantId})");
+                            }
+                            else
+                            {
+                                this.logger.LogError($"FAILED to creat storage account for tenant: {tenantName} ({tenantId})");
+                            }
+
+                            //send webhook notificiation for service
                             await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters);
                         }
                         catch (MarketplaceException fex)
@@ -675,6 +678,9 @@ public class HomeController : BaseController
                         }
 
                         this.unsubscribeStatusHandlers.Process(subscriptionId);
+
+                        //send webhook notificiation for service
+                        await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters);
                     }
                 }
 

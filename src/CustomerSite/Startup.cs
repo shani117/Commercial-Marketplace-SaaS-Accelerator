@@ -111,6 +111,7 @@ public class Startup
         services
             .AddDbContext<SaasKitContext>(options => options.UseSqlServer(this.Configuration.GetConnectionString("DefaultConnection")));
 
+        //make sure the app service is marked as a contributor on the subscription and has permissions to write to the AKV.
         ArmClient armClient = new ArmClient(new DefaultAzureCredential(), Configuration["AzureSubscriptionId"]);
         SecretClient secretClient = new SecretClient(vaultUri: new Uri(Configuration["VaultUrl"]), credential: new DefaultAzureCredential());
 

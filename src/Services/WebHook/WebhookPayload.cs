@@ -109,4 +109,13 @@ public class WebhookPayload
     /// </value>
     [JsonPropertyName("subscription")]
     public SubscriptionWebhookResult Subscription { get; set; }
+
+    /// <summary>
+    /// Gets or sets the beneficiary.
+    /// </summary>
+    /// <value>
+    /// The beneficiary.
+    /// </value>
+    [JsonPropertyName("beneficiary")]
+    public BeneficiaryResult Beneficiary { get; set; }
 }
