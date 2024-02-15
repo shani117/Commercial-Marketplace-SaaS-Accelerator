@@ -19,4 +19,9 @@ public enum WebNotificationEventTypeEnum
     /// The Webhook.
     /// </summary>
     Webhook,
+
+    /// <summary>
+    /// The Admin page.
+    /// </summary>
+    AdminPage,
 }

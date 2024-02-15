@@ -5,10 +5,21 @@
 
 @{
     ViewData["Title"] = "Home";
+    var tokenParam = this.TempData["AMPToken"];
 }
 @if (!Model.ShowWelcomeScreen)
 {
     <div class="container" id="divHome">
+
+        <div class="mt20">
+            <span class="cm-section-heading">Admin Consent & App Role Assignment</span>
+            <div>
+                To complete the subscripiton process, you need to admin consent to our application in your tenant by enrolling it into our service offering.<br />
+                You can go to <a href="https://cionsystemstenantux.azurewebsites.net/" target="_blank">Cion Systems Entra ID Management Application</a> to consent to our SPN and come back here to complete the subscription process.<br />
+                Once you have completed the consent process, you need to provision users from your tenant with appropriate roles to use the application. Use the <b>Role Assignments</b> menu tab to complete this task.
+            </div>
+        </div>
+
         <form method="post" id="frmIndex">
 
             <div class="text-white mt20">
@@ -233,14 +244,20 @@ else
 }
 <script type="text/javascript">
 
+    $(document).ajaxStop($.unblockUI);
+
     function SubscriptionOperation(subscriptionId, planId, operation) {
         if (validate()) {
+            $.blockUI({ message: '<h1><img src="busy.gif" /> Just a moment...</h1>' });
             var formobject = $('#frmIndex').serialize();
             $.ajax({
                 url: '/Home/SubscriptionOperation',
                 type: 'POST',
                 data: formobject + "&subscriptionId=" + subscriptionId + "&planId=" + planId + "&operation=" + operation,
                 cache: false,
+                complete: function () {
+                    $.unblockUI();
+                },
                 success: function (result) {
                     $('#divIndex').html(result);
                 },
@@ -259,8 +276,7 @@ else
 
         }
     }
-
-
+    
     function validate() {
         var valid = true;
         $(':input[required]:visible').each(function () {

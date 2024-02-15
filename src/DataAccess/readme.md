@@ -23,7 +23,8 @@ Once the migration is created, you need to apply to the database.
 
 ### Making additional changes after a migration was created
 
-Ideally, you want to limit the number of migrations you execute in one PR. If for some reason, you need to make additional changes to the database after you generated a migration, it is best to update the migration than create a new one. To update a migration, you need to remove the one you create it and create it again (after you made more changes to the DataModel)
+Ideally, you want to limit the number of migrations you execute in one PR. If for some reason, you need to make additional changes to the database after you generated a migration, it is best to update the migration than create a new one. To update a migration, you need to remove the one you create it and create it again 
+(after you made more changes to the DataModel)
 
 1. Remove the migration
    `dotnet-ef migrations remove --project .\DataAccess\ --startup-project .\AdminSite\`

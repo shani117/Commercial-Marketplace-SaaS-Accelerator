@@ -67,7 +67,7 @@ public class WebNotificationService : IWebNotificationService
         WebNotificationPayload webNotificationLandingpagePayload = new WebNotificationPayload()
         {
             ApplicationName = this.applicationConfigRepository.GetValueByName("ApplicationName"),
-            EventType = WebNotificationEventTypeEnum.LandingPage,
+            EventType = SubscriptionParameters != null ? WebNotificationEventTypeEnum.LandingPage : WebNotificationEventTypeEnum.AdminPage,
             PayloadFromLandingpage = new WebNotificationSubscription()
             {
                 
@@ -116,11 +116,23 @@ public class WebNotificationService : IWebNotificationService
     /// <param name="WebhookPayload">Content of the Webhook Payload.</param>
     public async Task PushExternalWebNotificationAsync(WebhookPayload WebhookPayload)
     {
+        var getSubApiResult = await this.apiService.GetSubscriptionByIdAsync(WebhookPayload.SubscriptionId).ConfigureAwait(false);
+        if (getSubApiResult != null)
+        {
+            WebhookPayload.Beneficiary = new BeneficiaryResult
+            {
+                EmailId = getSubApiResult.Beneficiary.EmailId,
+                TenantId = getSubApiResult.Beneficiary.TenantId,
+                Puid = getSubApiResult.Beneficiary.Puid,
+                ObjectId = getSubApiResult.Beneficiary.ObjectId,
+            };
+        }
+
         WebNotificationPayload webNotificationWebhookPayload = new WebNotificationPayload()
         {
             ApplicationName = this.applicationConfigRepository.GetValueByName("ApplicationName"),
             EventType = WebNotificationEventTypeEnum.Webhook,
-            PayloadFromWebhook = WebhookPayload,
+            PayloadFromWebhook = WebhookPayload,            
         };
 
         JsonSerializerOptions options = new JsonSerializerOptions();
@@ -140,6 +152,7 @@ public class WebNotificationService : IWebNotificationService
         try
         {
             var WebNotificationUrl = this.applicationConfigRepository.GetValueByName("WebNotificationUrl");
+            var handshakeSecret = this.applicationConfigRepository.GetValueByName("WebNotificationHandshake");
 
             if (!String.IsNullOrWhiteSpace(WebNotificationUrl))
             {
@@ -147,6 +160,7 @@ public class WebNotificationService : IWebNotificationService
                 {
                     // Create a StringContent object with the payload
                     var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+                    content.Headers.Add("WebNotificationHandshake", handshakeSecret);
 
                     // Send a POST request to the webhook URL
                     var response = await httpClient.PostAsync(WebNotificationUrl, content);

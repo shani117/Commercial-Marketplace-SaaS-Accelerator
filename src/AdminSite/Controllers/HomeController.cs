@@ -100,7 +100,11 @@ public class HomeController : BaseController
 
     private readonly ApplicationConfigService applicationConfigService;
 
+    private readonly IWebNotificationService _webNotificationService;
+
     private UserService userService;
+
+    private IAzureSubService azureSubService;
 
     private SubscriptionService subscriptionService = null;
 
@@ -110,7 +114,6 @@ public class HomeController : BaseController
     /// <summary>
     /// Initializes a new instance of the <see cref="HomeController" /> class.
     /// </summary>
-    /// <param name="usersRepository">The users repository.</param>
     /// <param name="billingApiService">The billing API service.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="subscriptionRepo">The subscription repo.</param>
@@ -125,14 +128,17 @@ public class HomeController : BaseController
     /// <param name="emailTemplateRepository">The email template repository.</param>
     /// <param name="planEventsMappingRepository">The plan events mapping repository.</param>
     /// <param name="eventsRepository">The events repository.</param>
-    /// <param name="SaaSApiClientConfiguration">The SaaSApiClientConfiguration.</param>
-    /// <param name="cloudConfigs">The cloud configs.</param>
+    /// <param name="saaSApiClientConfiguration">The SaaSApiClientConfiguration.</param>
+    /// <param name="webNotificationService">The web notification service</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <param name="emailService">The email service.</param>
     /// <param name="offersRepository">The offers repository.</param>
     /// <param name="offersAttributeRepository">The offers attribute repository.</param>
-    public HomeController(
-        IUsersRepository usersRepository, IMeteredBillingApiService billingApiService,  ISubscriptionsRepository subscriptionRepo, IPlansRepository planRepository, ISubscriptionUsageLogsRepository subscriptionUsageLogsRepository, IMeteredDimensionsRepository dimensionsRepository, ISubscriptionLogRepository subscriptionLogsRepo, IApplicationConfigRepository applicationConfigRepository, IUsersRepository userRepository, IFulfillmentApiService fulfillApiService, IApplicationLogRepository applicationLogRepository, IEmailTemplateRepository emailTemplateRepository, IPlanEventsMappingRepository planEventsMappingRepository, IEventsRepository eventsRepository, SaaSApiClientConfiguration saaSApiClientConfiguration, ILoggerFactory loggerFactory, IEmailService emailService, IOffersRepository offersRepository, IOfferAttributesRepository offersAttributeRepository, SaaSClientLogger<HomeController> logger) : base(applicationConfigRepository)
+    /// <param name="azSubService">The Azure subscription management serivce to manipulate storage accounts</param>
+    public HomeController(IMeteredBillingApiService billingApiService,  ISubscriptionsRepository subscriptionRepo, IPlansRepository planRepository, ISubscriptionUsageLogsRepository subscriptionUsageLogsRepository, IMeteredDimensionsRepository dimensionsRepository, ISubscriptionLogRepository subscriptionLogsRepo, 
+        IApplicationConfigRepository applicationConfigRepository, IUsersRepository userRepository, IFulfillmentApiService fulfillApiService, IApplicationLogRepository applicationLogRepository, IEmailTemplateRepository emailTemplateRepository, IPlanEventsMappingRepository planEventsMappingRepository, 
+        IEventsRepository eventsRepository, SaaSApiClientConfiguration saaSApiClientConfiguration, IWebNotificationService webNotificationService, ILoggerFactory loggerFactory, IEmailService emailService, IOffersRepository offersRepository, IOfferAttributesRepository offersAttributeRepository, 
+        SaaSClientLogger<HomeController> logger, IAzureSubService azSubService) : base(applicationConfigRepository)
     {
         this.billingApiService = billingApiService;
         this.subscriptionRepo = subscriptionRepo;
@@ -156,8 +162,10 @@ public class HomeController : BaseController
         this.emailService = emailService;
         this.offersRepository = offersRepository;
         this.offersAttributeRepository = offersAttributeRepository;
+        this._webNotificationService = webNotificationService;
         this.loggerFactory = loggerFactory;
         this.saaSApiClientConfiguration = saaSApiClientConfiguration;
+        this.azureSubService = azSubService;
 
         this.pendingActivationStatusHandlers = new PendingActivationStatusHandler(
             fulfillApiService,
@@ -386,7 +394,7 @@ public class HomeController : BaseController
     /// <param name="operation">The operation.</param>
     /// <param name="numberofProviders">The numberof providers.</param>
     /// <returns> The <see cref="IActionResult" />.</returns>
-    public IActionResult SubscriptionOperation(Guid subscriptionId, string planId, string operation, int numberofProviders)
+    public async Task<IActionResult> SubscriptionOperation(Guid subscriptionId, string planId, string operation, int numberofProviders)
     {
         this.logger.Info(HttpUtility.HtmlEncode($"Home Controller / SubscriptionOperation subscriptionId:{subscriptionId} :: planId : {planId} :: operation:{operation} :: NumberofProviders : {numberofProviders}"));
         try
@@ -413,6 +421,21 @@ public class HomeController : BaseController
                 }
 
                 this.pendingActivationStatusHandlers.Process(subscriptionId);
+
+                var subscriptionResultExtension = this.subscriptionService.GetSubscriptionsBySubscriptionId(subscriptionId);
+                //whether auto provisioning is supported OR not, we should create the tenant specific resources in the publisher sub
+                var tenantName = subscriptionResultExtension.Purchaser.EmailId.Substring(subscriptionResultExtension.Purchaser.EmailId.IndexOf("@") + 1).Replace(".onmicrosoft.com", "");
+                var tenantId = subscriptionResultExtension.Purchaser.TenantId.ToString();
+                //This process will create the storage account for the tenant with the settings we want, creates 2 containers in the storage account and writes the storage keys to the AKV.
+                var result = await this.azureSubService.InitializeTenantStorageAndAkv(tenantName, tenantId);
+                if (result)
+                {
+                    this.logger.Info($"Successfully created storage account for tenant: {tenantName} ({tenantId})");
+                }
+                else
+                {
+                    this.logger.LogError($"FAILED to creat storage account for tenant: {tenantName} ({tenantId})");
+                }
             }
 
             if (operation == "Deactivate")
@@ -431,6 +454,9 @@ public class HomeController : BaseController
 
                 this.unsubscribeStatusHandlers.Process(subscriptionId);
             }
+
+            //send notification to downstream webhooks
+            await this._webNotificationService.PushExternalWebNotificationAsync(subscriptionId, null);
 
             this.notificationStatusHandlers.Process(subscriptionId);
 

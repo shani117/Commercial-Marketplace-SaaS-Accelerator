@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Web;
 using Marketplace.SaaS.Accelerator.DataAccess.Contracts;
 using Marketplace.SaaS.Accelerator.DataAccess.Entities;
+using Marketplace.SaaS.Accelerator.Services.Configurations;
 using Marketplace.SaaS.Accelerator.Services.Contracts;
 using Marketplace.SaaS.Accelerator.Services.Exceptions;
 using Marketplace.SaaS.Accelerator.Services.Models;
@@ -96,6 +97,12 @@ public class HomeController : BaseController
 
     private PlanService planService = null;
 
+    private SaaSApiClientConfiguration saaSApiClientConfiguration;
+
+    private IAzureSubService azureSubService;
+
+    private HashSet<string> stateGuids = new HashSet<string>();
+
     /// <summary>
     /// The user service.
     /// </summary>
@@ -105,7 +112,7 @@ public class HomeController : BaseController
     /// Initializes a new instance of the <see cref="HomeController" /> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    /// <param name="apiClient">The API Client<see cref="IFulfilmentApiClient" />.</param>
+    /// <param name="apiService">The API Client<see cref="IFulfilmentApiClient" />.</param>
     /// <param name="subscriptionRepo">The subscription repository.</param>
     /// <param name="planRepository">The plan repository.</param>
     /// <param name="userRepository">The user repository.</param>
@@ -117,10 +124,15 @@ public class HomeController : BaseController
     /// <param name="planEventsMappingRepository">The plan events mapping repository.</param>
     /// <param name="offerAttributesRepository">The offer attributes repository.</param>
     /// <param name="eventsRepository">The events repository.</param>
-    /// <param name="cloudConfigs">The cloud configs.</param>
+    /// <param name="saaSApiClientConfiguration">The SaaSApiClientConfiguration.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <param name="emailService">The email service.</param>
-    public HomeController(SaaSClientLogger<HomeController> logger, IFulfillmentApiService apiService, ISubscriptionsRepository subscriptionRepo, IPlansRepository planRepository, IUsersRepository userRepository, IApplicationLogRepository applicationLogRepository, ISubscriptionLogRepository subscriptionLogsRepo, IApplicationConfigRepository applicationConfigRepository, IEmailTemplateRepository emailTemplateRepository, IOffersRepository offersRepository, IPlanEventsMappingRepository planEventsMappingRepository, IOfferAttributesRepository offerAttributesRepository, IEventsRepository eventsRepository, ILoggerFactory loggerFactory, IEmailService emailService,IWebNotificationService webNotificationService)
+    /// <param name="webNotificationService">The web notification service</param>
+    /// <param name="azSubService">The Azure subscription management serivce to manipulate storage accounts</param>
+    public HomeController(SaaSClientLogger<HomeController> logger, IFulfillmentApiService apiService, ISubscriptionsRepository subscriptionRepo, IPlansRepository planRepository, IUsersRepository userRepository, IApplicationLogRepository applicationLogRepository, ISubscriptionLogRepository subscriptionLogsRepo, 
+        IApplicationConfigRepository applicationConfigRepository,  IEmailTemplateRepository emailTemplateRepository, IOffersRepository offersRepository, IPlanEventsMappingRepository planEventsMappingRepository, IOfferAttributesRepository offerAttributesRepository, IEventsRepository eventsRepository, 
+        SaaSApiClientConfiguration saaSApiClientConfiguration, ILoggerFactory loggerFactory, 
+        IEmailService emailService,IWebNotificationService webNotificationService, IAzureSubService azSubService)
     {
         this.apiService = apiService;
         this.subscriptionRepository = subscriptionRepo;
@@ -141,8 +153,10 @@ public class HomeController : BaseController
         this.planService = new PlanService(this.planRepository, this.offerAttributesRepository, this.offersRepository);
         this.eventsRepository = eventsRepository;
         this.emailService = emailService;
+        this.saaSApiClientConfiguration = saaSApiClientConfiguration;
         this.loggerFactory = loggerFactory;
         this._webNotificationService = webNotificationService;
+        this.azureSubService = azSubService;
 
         this.pendingActivationStatusHandlers = new PendingActivationStatusHandler(
             apiService,
@@ -270,11 +284,12 @@ public class HomeController : BaseController
             {
                 if (!string.IsNullOrEmpty(token))
                 {
-                    return this.Challenge(
-                        new AuthenticationProperties
-                        {
-                            RedirectUri = "/?token=" + token,
-                        }, OpenIdConnectDefaults.AuthenticationScheme);
+                    var authProps = new AuthenticationProperties
+                    {
+                        RedirectUri = "/?token=" + token,
+                    };
+
+                    return this.Challenge( authProps, OpenIdConnectDefaults.AuthenticationScheme);
                 }
                 else
                 {
@@ -292,6 +307,41 @@ public class HomeController : BaseController
             return this.View("Error", ex);
         }
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    private IActionResult RequestAdminConsent(string tenantId, string token)
+    {
+        this.logger.Info("Home Controller / RequestAdminConsent ");
+
+        if (!string.IsNullOrEmpty(tenantId))
+        {
+            var clientId = this.saaSApiClientConfiguration.MTClientId;
+            var state = Guid.NewGuid().ToString(); // Generate a new GUID
+            this.stateGuids.Add(state);
+            var redirectUri = Url.Action("AdminConsentCallback", "Home", new { token }, Request.Scheme);
+
+            var adminConsentUrl = $"https://login.microsoftonline.com/{tenantId}/adminconsent?client_id={clientId}&state={state}";
+
+            return Redirect(adminConsentUrl);
+        }
+        return RedirectToAction("Index", new { token });
+    }
+
+    private IActionResult AdminConsentCallback(string admin_consent, string tenant, string state, string token)
+    {
+        // Validate the state value to ensure it's the one you generated
+        // Handle the admin consent response
+        this.logger.Info("Home Controller / AdminConsentCallback ");
+        if(admin_consent.Equals("true", StringComparison.InvariantCultureIgnoreCase) && stateGuids.Contains(state))
+        {
+            stateGuids.Remove(state);
+            RedirectToAction("Index", new { token, consentGranted = true });
+        }
+        var ex = new ApplicationException("Error occured in the consent flow, please try again");
+        return this.View("Error", ex);
+    }
+
 
     /// <summary>
     /// Subscription this instance.
@@ -586,7 +636,22 @@ public class HomeController : BaseController
                             {
                                 this.pendingFulfillmentStatusHandlers.Process(subscriptionId);
                             }
-                            
+
+                            //whether auto provisioning is supported OR not, we should create the tenant specific resources in the publisher sub
+                            var tenantName = subscriptionResultExtension.Purchaser.EmailId.Substring(subscriptionResultExtension.Purchaser.EmailId.IndexOf("@") + 1).Replace(".onmicrosoft.com", "");
+                            var tenantId = subscriptionResultExtension.Purchaser.TenantId.ToString();
+                            //This process will create the storage account for the tenant with the settings we want, creates 2 containers in the storage account and writes the storage keys to the AKV.
+                            var result = await this.azureSubService.InitializeTenantStorageAndAkv(tenantName, tenantId);
+                            if (result)
+                            {
+                                this.logger.Info($"Successfully created storage account for tenant: {tenantName} ({tenantId})");
+                            }
+                            else
+                            {
+                                this.logger.LogError($"FAILED to creat storage account for tenant: {tenantName} ({tenantId})");
+                            }
+
+                            //send webhook notificiation for service
                             await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters);
                         }
                         catch (MarketplaceException fex)
@@ -613,6 +678,9 @@ public class HomeController : BaseController
                         }
 
                         this.unsubscribeStatusHandlers.Process(subscriptionId);
+
+                        //send webhook notificiation for service
+                        await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters);
                     }
                 }
 

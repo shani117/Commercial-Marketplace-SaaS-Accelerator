@@ -47,6 +47,8 @@
                 @if (this.User.Identity.IsAuthenticated)
                 {
                     <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                    <a class="nav-link" asp-area="" asp-controller="Graph" asp-action="Profile">Profile</a>
+                    <a class="nav-link" asp-area="" asp-controller="Graph" asp-action="AppRoleMgmt">Role Assignments</a>
                     @if (TempData["ShowWelcomeScreen"] != null && Convert.ToString(TempData["ShowWelcomeScreen"]) == "True")
                     {
                         <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Subscriptions">Subscriptions</a>
@@ -72,6 +74,7 @@
     <script src="~/lib/jquery/dist/jquery.js"></script>
     <script src="~/lib/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="~/js/jquery.blockUI.js"></script>
     <script src="~/js/script.js"></script>
     <script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js" asp-append-version="true"></script>
     @* <script src="https://cdn.datatables.net/1.10.20/js/dataTables.bootstrap4.min.js" asp-append-version="true"></script> *@

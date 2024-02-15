@@ -3,6 +3,8 @@
 
 using System;
 using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.Security.KeyVault.Secrets;
 using Marketplace.SaaS.Accelerator.AdminSite.Controllers;
 using Marketplace.SaaS.Accelerator.DataAccess.Context;
 using Marketplace.SaaS.Accelerator.DataAccess.Contracts;
@@ -83,7 +85,7 @@ public class Startup
         {
             KnownUsers = this.Configuration["KnownUsers"],
         };
-        var creds = new ClientSecretCredential(config.TenantId.ToString(), config.ClientId.ToString(), config.ClientSecret);
+        var creds = new ClientSecretCredential(config.TenantId.ToString(), config.MTClientId.ToString(), config.ClientSecret);
 
 
         services
@@ -95,8 +97,8 @@ public class Startup
             })
             .AddOpenIdConnect(options =>
             {
-                options.Authority = $"{config.AdAuthenticationEndPoint}/common/v2.0";
-                options.ClientId = config.MTClientId;
+                options.Authority = $"{config.AdAuthenticationEndPoint}/{config.TenantId}/v2.0";
+                options.ClientId = config.ClientId;
                 options.ResponseType = OpenIdConnectResponseType.IdToken;
                 options.CallbackPath = "/Home/Index";
                 options.SignedOutRedirectUri = config.SignedOutRedirectUri;
@@ -123,14 +125,20 @@ public class Startup
             .AddSingleton<KnownUsersModel>(knownUsers);
             
 
-
-
-        services
-            .AddScoped<ApplicationConfigService>()
-        ;
+        services.AddScoped<ApplicationConfigService>();
 
         services
             .AddDbContext<SaasKitContext>(options => options.UseSqlServer(this.Configuration.GetConnectionString("DefaultConnection")));
+
+        //make sure the app service is marked as a contributor on the subscription and has permissions to write to the AKV.
+        ArmClient armClient = new ArmClient(new DefaultAzureCredential(), Configuration["AzureSubscriptionId"]);
+        SecretClient secretClient = new SecretClient(vaultUri: new Uri(Configuration["VaultUrl"]), credential: new DefaultAzureCredential());
+
+        services.AddScoped<IAzureSubService, AzureSubService>(provider =>
+        {
+            SaaSClientLogger<AzureSubService> subLogger = new SaaSClientLogger<AzureSubService>();
+            return new AzureSubService(armClient, secretClient, subLogger);
+        });
 
 
         InitializeRepositoryServices(services);
@@ -217,5 +225,6 @@ public class Startup
         services.AddScoped<SaaSClientLogger<ApplicationLogController>>();
         services.AddScoped<SaaSClientLogger<ApplicationConfigController>>();
         services.AddScoped<SaaSClientLogger<SchedulerController>>();
+        services.AddScoped<IWebNotificationService, WebNotificationService>();
     }
 }
