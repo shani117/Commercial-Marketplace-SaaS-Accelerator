@@ -652,7 +652,7 @@ public class HomeController : BaseController
                             }
 
                             //send webhook notificiation for service
-                            await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters);
+                            await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters, WebNotificationEventTypeEnum.LandingPage);
                         }
                         catch (MarketplaceException fex)
                         {
@@ -680,7 +680,7 @@ public class HomeController : BaseController
                         this.unsubscribeStatusHandlers.Process(subscriptionId);
 
                         //send webhook notificiation for service
-                        await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters);
+                        await _webNotificationService.PushExternalWebNotificationAsync(subscriptionId, subscriptionResultExtension.SubscriptionParameters, WebNotificationEventTypeEnum.LandingPage);
                     }
                 }
 
