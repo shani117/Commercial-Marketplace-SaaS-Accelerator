@@ -10,6 +10,7 @@ using Marketplace.SaaS.Accelerator.Services.Configurations;
 using Marketplace.SaaS.Accelerator.Services.Exceptions;
 using Marketplace.SaaS.Accelerator.Services.Services;
 using Marketplace.SaaS.Accelerator.Services.WebHook;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Marketplace.SaaS.Accelerator.CustomerSite.Controllers.WebHook;
@@ -18,6 +19,7 @@ namespace Marketplace.SaaS.Accelerator.CustomerSite.Controllers.WebHook;
 /// Azure Web hook.
 /// </summary>
 /// <seealso cref="Microsoft.AspNetCore.Mvc.ControllerBase" />
+[AllowAnonymous]
 [Route("api/[controller]")]
 [ApiController]
 public class AzureWebhookController : ControllerBase
