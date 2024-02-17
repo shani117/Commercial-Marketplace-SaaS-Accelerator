@@ -17,7 +17,7 @@ public interface IWebNotificationService
     /// </summary>
     /// <param name="SubscriptiondId">Subscription Id.</param>
     /// <param name="SubscriptionParameters">Subscription Parameters.</param>
-    Task PushExternalWebNotificationAsync(Guid SubscriptiondId, List<SubscriptionParametersModel> SubscriptionParameters);
+    Task PushExternalWebNotificationAsync(Guid SubscriptiondId, List<SubscriptionParametersModel> SubscriptionParameters, WebNotificationEventTypeEnum eventType);
 
     /// <summary>
     /// Prepare the webhook notification payload.

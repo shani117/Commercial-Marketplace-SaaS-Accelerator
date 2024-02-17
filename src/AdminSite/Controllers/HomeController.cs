@@ -456,7 +456,7 @@ public class HomeController : BaseController
             }
 
             //send notification to downstream webhooks
-            await this._webNotificationService.PushExternalWebNotificationAsync(subscriptionId, null);
+            await this._webNotificationService.PushExternalWebNotificationAsync(subscriptionId, null, WebNotificationEventTypeEnum.AdminPage);
 
             this.notificationStatusHandlers.Process(subscriptionId);
 

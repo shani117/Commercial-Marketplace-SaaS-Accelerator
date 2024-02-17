@@ -50,8 +50,6 @@ public class WebhookProcessor : IWebhookProcessor
     /// <returns> Notification.</returns>
     public async Task ProcessWebhookNotificationAsync(WebhookPayload payload, SaaSApiClientConfiguration config)
     {
-        await _webNotificationService.PushExternalWebNotificationAsync(payload);
-
         switch (payload.Action)
         {
             case WebhookAction.Unsubscribe:
@@ -82,5 +80,7 @@ public class WebhookProcessor : IWebhookProcessor
                 await this.webhookHandler.UnknownActionAsync(payload).ConfigureAwait(false);
                 break;
         }
+
+        await _webNotificationService.PushExternalWebNotificationAsync(payload);
     }
 }

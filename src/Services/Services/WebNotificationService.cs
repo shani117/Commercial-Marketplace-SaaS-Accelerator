@@ -21,7 +21,7 @@ public class WebNotificationService : IWebNotificationService
     /// <summary>
     /// Defines the  API Client.
     /// </summary>
-    private readonly IFulfillmentApiService apiService;
+    private readonly ISubscriptionsRepository subscriptionsRepository;
 
     /// <summary>
     /// Defines the  Application Config Repo.
@@ -41,14 +41,14 @@ public class WebNotificationService : IWebNotificationService
     /// <summary>
     /// Initializes a new instance of the <see cref="WebNotificationService"/> class.
     /// </summary>
-    /// <param name="apiService">apiService.</param>
+    /// <param name="subscriptionsRepository">Subscription repository.</param>
     /// <param name="applicationConfigRepository">applicationConfigRepository.</param>
-    /// <param name="saaSApiClientConfiguration">saaSApiClientConfiguration.</param>
-    public WebNotificationService(IFulfillmentApiService apiService,
+    /// <param name="applicationLogRepository">Application log repository.</param>
+    public WebNotificationService(ISubscriptionsRepository subscriptionsRepository,
                                   IApplicationConfigRepository applicationConfigRepository,
                                   IApplicationLogRepository applicationLogRepository)
     {
-        this.apiService = apiService;
+        this.subscriptionsRepository = subscriptionsRepository;
         this.applicationConfigRepository = applicationConfigRepository;
         this.applicationLogRepository = applicationLogRepository;
         this.applicationLogService = new ApplicationLogService(this.applicationLogRepository);
@@ -60,45 +60,42 @@ public class WebNotificationService : IWebNotificationService
     /// </summary>
     /// <param name="SubscriptiondId">Subscription Id.</param>
     /// <param name="SubscriptionParameters">Subscription Parameters.</param>
-    public async Task PushExternalWebNotificationAsync(Guid SubscriptiondId, List<SubscriptionParametersModel> SubscriptionParameters)
-    {
-        var getSubApiResult = await this.apiService.GetSubscriptionByIdAsync(SubscriptiondId).ConfigureAwait(false);
+    public async Task PushExternalWebNotificationAsync(Guid SubscriptiondId, List<SubscriptionParametersModel> SubscriptionParameters, WebNotificationEventTypeEnum eventType)
+    {   
+        var getSubApiResult = this.subscriptionsRepository.GetById(SubscriptiondId);
 
         WebNotificationPayload webNotificationLandingpagePayload = new WebNotificationPayload()
         {
             ApplicationName = this.applicationConfigRepository.GetValueByName("ApplicationName"),
-            EventType = SubscriptionParameters != null ? WebNotificationEventTypeEnum.LandingPage : WebNotificationEventTypeEnum.AdminPage,
+            EventType = eventType,
             PayloadFromLandingpage = new WebNotificationSubscription()
             {
                 
                 LandingPageCustomFields = SubscriptionParameters?
                                             .Select(subparam => new WebNotificationLandingPageParam(subparam.DisplayName, subparam.Value))?
                                             .ToList() ?? new List<WebNotificationLandingPageParam>(),
-                Id = getSubApiResult.Id,
-                PublisherId = getSubApiResult.PublisherId,
-                OfferId = getSubApiResult.OfferId,
+                Id = getSubApiResult.AmpsubscriptionId,
+                //PublisherId = getSubApiResult.PublisherId,
+                //OfferId = getSubApiResult.OfferId,
                 Name = getSubApiResult.Name,
-                SaasSubscriptionStatus = getSubApiResult.SaasSubscriptionStatus,
-                PlanId = getSubApiResult.PlanId,
-                Quantity = getSubApiResult.Quantity,
+                SaasSubscriptionStatus = Enum.Parse<SubscriptionStatusEnum>(getSubApiResult.SubscriptionStatus),
+                PlanId = getSubApiResult.AmpplanId,
+                Quantity = getSubApiResult.Ampquantity,
                 Purchaser = new PurchaserResult
                 {
-                    EmailId = getSubApiResult.Purchaser.EmailId,
-                    TenantId = getSubApiResult.Purchaser.TenantId,
-                    ObjectId = getSubApiResult.Purchaser.ObjectId,
+                    EmailId = getSubApiResult.PurchaserEmail,
+                    TenantId = (Guid)getSubApiResult.PurchaserTenantId,
                 },
                 Beneficiary = new BeneficiaryResult
                 {
-                    EmailId = getSubApiResult.Beneficiary.EmailId,
-                    TenantId = getSubApiResult.Beneficiary.TenantId,
-                    Puid = getSubApiResult.Beneficiary.Puid,
-                    ObjectId = getSubApiResult.Beneficiary.ObjectId,
+                    EmailId = getSubApiResult.PurchaserEmail,
+                    TenantId = (Guid)getSubApiResult.PurchaserTenantId,
                 },
                 Term = new TermResult
                 {
-                    EndDate = getSubApiResult.Term.EndDate,
-                    StartDate = getSubApiResult.Term.StartDate,
-                    TermUnit = getSubApiResult.Term.TermUnit,
+                    EndDate = new DateTimeOffset((DateTime)getSubApiResult.EndDate),
+                    StartDate = new DateTimeOffset((DateTime)getSubApiResult.StartDate),
+                    TermUnit = Enum.Parse<TermUnitEnum>(getSubApiResult.Term),
                 },
             },
             PayloadFromWebhook = null
@@ -116,15 +113,14 @@ public class WebNotificationService : IWebNotificationService
     /// <param name="WebhookPayload">Content of the Webhook Payload.</param>
     public async Task PushExternalWebNotificationAsync(WebhookPayload WebhookPayload)
     {
-        var getSubApiResult = await this.apiService.GetSubscriptionByIdAsync(WebhookPayload.SubscriptionId).ConfigureAwait(false);
+        var getSubApiResult = this.subscriptionsRepository.GetById(WebhookPayload.SubscriptionId);
+
         if (getSubApiResult != null)
         {
             WebhookPayload.Beneficiary = new BeneficiaryResult
             {
-                EmailId = getSubApiResult.Beneficiary.EmailId,
-                TenantId = getSubApiResult.Beneficiary.TenantId,
-                Puid = getSubApiResult.Beneficiary.Puid,
-                ObjectId = getSubApiResult.Beneficiary.ObjectId,
+                EmailId = getSubApiResult.PurchaserEmail,
+                TenantId = (Guid)getSubApiResult.PurchaserTenantId,
             };
         }
 
