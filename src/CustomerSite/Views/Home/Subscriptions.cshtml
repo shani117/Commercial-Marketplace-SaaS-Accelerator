@@ -25,6 +25,7 @@
                             <table id="table" class="table table-bordered dt-responsive cm-table mt20">
                                 <thead class="cm-table-head">
                                     <tr>
+                                        <th>App Link</th>
                                         <th>Name</th>
                                         <th>Offer</th>
                                         <th>Plan</th>
@@ -34,6 +35,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <tr><a target="_blank" href="@Model.SaaSAppUrl">CionSystems Entra ID Auditor &amp; Restore</a> </tr>
                                     @for (var i = 0; i < Model.Subscriptions.Count; i++)
                                     {
                                         var subscription = Model.Subscriptions[i];

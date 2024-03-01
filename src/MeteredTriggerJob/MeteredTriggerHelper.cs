@@ -39,6 +39,10 @@ public class Executor
     /// </summary>
     private readonly IApplicationConfigRepository applicationConfigRepository;
     /// <summary>
+    /// Application Config Repository Interface
+    /// </summary>
+    private readonly ISubscriptionsRepository subscriptionsRepository;
+    /// <summary>
     /// Email Template Repository Interface
     /// </summary>
     private readonly IEmailTemplateRepository emailTemplateRepository;
@@ -74,6 +78,7 @@ public class Executor
         ISubscriptionUsageLogsRepository subscriptionUsageLogsRepository,
         IMeteredBillingApiService billingApiService,
         IApplicationConfigRepository applicationConfigRepository,
+        ISubscriptionsRepository subRepository,
         IEmailService emailService,
         IEmailTemplateRepository emailTemplateRepository, IApplicationLogRepository applicationLogRepository)
     {
@@ -83,6 +88,7 @@ public class Executor
         this.subscriptionUsageLogsRepository = subscriptionUsageLogsRepository;
         this.billingApiService = billingApiService;
         this.applicationConfigRepository = applicationConfigRepository;
+        this.subscriptionsRepository = subRepository;
         this.emailTemplateRepository = emailTemplateRepository;
         this.emailService = emailService;
         schedulerService = new MeteredPlanSchedulerManagementService(this.frequencyRepository, 
@@ -198,6 +204,9 @@ public class Executor
     /// <param name="item">scheduler task</param>
     private void TriggerSchedulerItem(SchedulerManagerViewModel item)
     {
+        //before emiting this event, we have to go get the count of enabled users from the subscrition tenant to determine the quantity to use for the metering event
+        //cionsys changes
+
         try
         {
             LogLine($"---- Scheduled Item Id: {item.Id} Start Triggering meter event ----",true);

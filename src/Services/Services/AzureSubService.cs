@@ -57,12 +57,19 @@ public class AzureSubService : IAzureSubService
             if (storageAcctRes != null && storageAcctRes.Value != null)
             {
                 _saaSClientLogger.Info($"Storage account for tenant {tenantName} already exsits!!");
-                var currSecret = await this._secretClient.GetSecretAsync($"DBConnString-{tenantId}");
-                if (currSecret != null && currSecret.Value != null)
+                try
                 {
-                    secretAlreadyCreated = true;
-                    _saaSClientLogger.Info($"Storage account AKV secret for tenant {tenantName} already exsits!! - {currSecret.Value.Name}");
+                    var currSecret = await this._secretClient.GetSecretAsync($"DBConnString-{tenantId}");
+                    if (currSecret != null && currSecret.Value != null)
+                    {
+                        secretAlreadyCreated = true;
+                        _saaSClientLogger.Info($"Storage account AKV secret for tenant {tenantName} already exsits!! - {currSecret.Value.Name}");
+                    }
                 }
+                catch (RequestFailedException ex) when (ex.Status == 404)
+                {
+                    _saaSClientLogger.Warn($"Secret DBConnString-{tenantId} does NOT exist in the keyvault, it'll be created instead.");
+                }                
             }
             else
             {

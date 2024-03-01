@@ -27,6 +27,7 @@ class Program
 
         IConfiguration configuration = new ConfigurationBuilder()
             .AddEnvironmentVariables()
+            .AddJsonFile("appSettings.json", true)
             .Build();
 
         var config = new SaaSApiClientConfiguration()
@@ -37,6 +38,14 @@ class Program
             GrantType = configuration["SaaSApiConfiguration:GrantType"],
             Resource = configuration["SaaSApiConfiguration:Resource"],
             TenantId = configuration["SaaSApiConfiguration:TenantId"]
+        };
+
+        var graphConfig = new GraphApiOptions()
+        {
+            GraphApiUrl = configuration["graphconfiguration:graphapiurl"],
+            GraphApiVersion = configuration["graphconfiguration:graphapiversion"],
+            GraphAppId = configuration["graphconfiguration:graphappid"],
+            GraphAppClientSecret = configuration["graphconfiguration:graphappclientsecret"]
         };
 
         var creds = new ClientSecretCredential(config.TenantId.ToString(), config.ClientId.ToString(), config.ClientSecret);
@@ -51,6 +60,7 @@ class Program
             .AddScoped<IEmailService, SMTPEmailService>()
             .AddScoped<IEmailTemplateRepository, EmailTemplateRepository>()
             .AddScoped<IApplicationConfigRepository, ApplicationConfigRepository>()
+            .AddScoped<ISubscriptionsRepository, SubscriptionsRepository>()
             .AddSingleton<IMeteredBillingApiService>(new MeteredBillingApiService(new MarketplaceMeteringClient(creds), config, new SaaSClientLogger<MeteredBillingApiService>()))
             .AddSingleton<Executor, Executor>()
             .BuildServiceProvider();
