@@ -45,7 +45,8 @@ class Program
             GraphApiUrl = configuration["graphconfiguration:graphapiurl"],
             GraphApiVersion = configuration["graphconfiguration:graphapiversion"],
             GraphAppId = configuration["graphconfiguration:graphappid"],
-            GraphAppClientSecret = configuration["graphconfiguration:graphappclientsecret"]
+            GraphAppClientSecret = configuration["graphconfiguration:graphappclientsecret"],
+            GraphScope = configuration["graphconfiguration:graphscope"]
         };
 
         var creds = new ClientSecretCredential(config.TenantId.ToString(), config.ClientId.ToString(), config.ClientSecret);
@@ -67,8 +68,9 @@ class Program
 
         services
             .GetService<Executor>()
-            .Execute();
+            .Execute(graphConfig);
         Console.WriteLine($"MeteredExecutor Webjob Ended at: {DateTime.Now}");
 
     }
-}
+
+ }

@@ -6,4 +6,5 @@ public class GraphApiOptions
     public string GraphApiVersion { get; set; }
     public string GraphAppId { get; set; }
     public string GraphAppClientSecret { get; set; }
+    public string GraphScope { get; set; }
 }

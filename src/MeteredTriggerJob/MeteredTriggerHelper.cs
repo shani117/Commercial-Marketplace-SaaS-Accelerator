@@ -2,13 +2,21 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Xml.Linq;
+using Azure.Identity;
 using Marketplace.SaaS.Accelerator.DataAccess.Contracts;
 using Marketplace.SaaS.Accelerator.DataAccess.Entities;
+using Marketplace.SaaS.Accelerator.Services.Configurations;
 using Marketplace.SaaS.Accelerator.Services.Contracts;
 using Marketplace.SaaS.Accelerator.Services.Exceptions;
 using Marketplace.SaaS.Accelerator.Services.Models;
 using Marketplace.SaaS.Accelerator.Services.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Microsoft.Graph;
+using Microsoft.Graph.Models;
+using Microsoft.Graph.Models.ODataErrors;
+using Microsoft.Marketplace.SaaS.Models;
 
 namespace Marketplace.SaaS.Accelerator.MeteredTriggerJob;
 
@@ -109,7 +117,7 @@ public class Executor
     /// <summary>
     /// Execute the scheduler engine
     /// </summary>
-    public void Execute()
+    public void Execute(GraphApiOptions apiOpts)
     {
         bool.TryParse(this.applicationConfigService.GetValueByName("IsMeteredBillingEnabled"), out bool supportMeteredBilling);
         if (supportMeteredBilling)
@@ -177,8 +185,8 @@ public class Executor
                             continue;
                         }
                         else if (timeDifferentInHours == 0)
-                        {
-                            TriggerSchedulerItem(scheduledItem);
+                        {                            
+                            TriggerSchedulerItem(scheduledItem, apiOpts);
                         }
                         else
                         {
@@ -202,10 +210,55 @@ public class Executor
     /// Trigger scheduler task
     /// </summary>
     /// <param name="item">scheduler task</param>
-    private void TriggerSchedulerItem(SchedulerManagerViewModel item)
+    private void TriggerSchedulerItem(SchedulerManagerViewModel item, GraphApiOptions apiOpts)
     {
         //before emiting this event, we have to go get the count of enabled users from the subscrition tenant to determine the quantity to use for the metering event
         //cionsys changes
+        var meteringQty = item.Quantity;
+        Subscriptions tenantSubs = null;
+
+        try
+        {
+            tenantSubs = this.subscriptionsRepository.GetById(item.AMPSubscriptionId);
+            if (tenantSubs == null) 
+            {
+                LogLine($"No subscriptions returned for {item.SubscriptionName}, {item.AMPSubscriptionId}. Cannot proceed further, needs investigation from team.");
+                UpdateSchedulerItem(item, "SubRepo.GetById", "NULL TenantSubs", "Skipped");
+                return;
+            }
+
+            var graphClient = CreateGraphServiceClient(apiOpts, tenantSubs.PurchaserTenantId.ToString());
+            var result = graphClient.Users.Count.GetAsync(cfg =>
+            {
+                cfg.Headers.Add("ConsistencyLevel", new string[] { "eventual" });
+                cfg.QueryParameters.Filter = "accountEnabled eq true";                
+            }).ConfigureAwait(false);
+            var newQty = result.GetAwaiter().GetResult();
+            if (newQty > 0)
+            {
+                LogLine($"Updated metering dimension quatity for tenant {tenantSubs.PurchaserTenantId}: Old Qty: {meteringQty}, New Qty: {newQty}");
+                meteringQty = (double)newQty;
+                item.Quantity = meteringQty;
+            }
+            else
+            {
+                LogLine($"New Qty for metering dimension quatity for tenant {tenantSubs.PurchaserTenantId} was <= 0. Will skip emittin metering event for this run: Old Qty: {meteringQty}, New Qty: {newQty}");
+                UpdateSchedulerItem(item, "QtyRequest", "New Qty was <=0", "Skipped");
+                return;
+            }
+        }
+        catch (ServiceException se)
+        {
+            LogLine($"Graph service exception occured when trying to retrieve enabled users for tenant {tenantSubs.PurchaserTenantId}. {se.Message}");
+            UpdateSchedulerItem(item, se.Message, se.RawResponseBody, "Skipped");
+            return;
+        }
+        catch (ODataError ode)
+        {
+            LogLine($"Graph service exception occured when trying to retrieve enabled users for tenant {tenantSubs.PurchaserTenantId}. {ode.Message}");
+            UpdateSchedulerItem(item, ode.Message, ode.ToString(), "Skipped");
+            return;
+        }
 
         try
         {
@@ -361,7 +414,27 @@ public class Executor
             // send email if it never ran
             schedulerService.SendSchedulerEmail(schedulerTask, meteredAuditItem);
         }
+    }
 
-        
+    private static GraphServiceClient CreateGraphServiceClient(GraphApiOptions graphApiOptions, string tenantId)
+    {
+        var scopes = new[] { graphApiOptions.GraphScope };
+
+        // Values from app registration
+        var clientId = graphApiOptions.GraphAppId;
+        var clientSecret = graphApiOptions.GraphAppClientSecret;
+
+        // using Azure.Identity;
+        var options = new AuthorizationCodeCredentialOptions
+        {
+            AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
+        };
+
+        // https://learn.microsoft.com/dotnet/api/azure.identity.authorizationcodecredential
+        var clientSecretCredential = new ClientSecretCredential(tenantId, clientId, clientSecret, options);
+
+        var graphClient = new GraphServiceClient(clientSecretCredential, scopes);
+
+        return graphClient;
     }
 }
