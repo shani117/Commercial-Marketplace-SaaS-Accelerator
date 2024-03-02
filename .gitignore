@@ -364,3 +364,4 @@ src/Marketplace.SaaS.Accelerator.CustomerSite/appsettings.Development.json
 /src/AdminSite/Properties/ServiceDependencies/CionSaasAdminPortal - Web Deploy/profile.arm.json
 /src/CustomerSite/Properties/ServiceDependencies/CionSaasPortal - Web Deploy/profile.arm.json
 /src/script.sql
+/src/MeteredTriggerJob/Properties/ServiceDependencies/CionSaasAdminPortal - Web Deploy/profile.arm.json
