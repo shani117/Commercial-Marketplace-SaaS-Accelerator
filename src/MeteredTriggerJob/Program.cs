@@ -32,12 +32,12 @@ class Program
 
         var config = new SaaSApiClientConfiguration()
         {
-            AdAuthenticationEndPoint = configuration["SaaSApiConfiguration:AdAuthenticationEndPoint"],
-            ClientId = configuration["SaaSApiConfiguration:ClientId"],
-            ClientSecret = configuration["SaaSApiConfiguration:ClientSecret"],
-            GrantType = configuration["SaaSApiConfiguration:GrantType"],
-            Resource = configuration["SaaSApiConfiguration:Resource"],
-            TenantId = configuration["SaaSApiConfiguration:TenantId"]
+            AdAuthenticationEndPoint = configuration["saasapiconfiguration:adauthenticationendpoint"],
+            ClientId = configuration["saasapiconfiguration:clientid"],
+            ClientSecret = configuration["saasapiconfiguration:clientsecret"],
+            GrantType = configuration["saasapiconfiguration:GrantType"],
+            Resource = configuration["saasapiconfiguration:resource"],
+            TenantId = configuration["saasapiconfiguration:tenantid"]
         };
 
         var graphConfig = new GraphApiOptions()
@@ -49,6 +49,7 @@ class Program
             GraphScope = configuration["graphconfiguration:graphscope"]
         };
 
+        Console.WriteLine($"Retrieved info from config: saasapiconfiguration:tenantid - {config?.TenantId}, graphconfiguration:graphappid - {graphConfig?.GraphAppId}");
         var creds = new ClientSecretCredential(config.TenantId.ToString(), config.ClientId.ToString(), config.ClientSecret);
 
         var services = new ServiceCollection()
